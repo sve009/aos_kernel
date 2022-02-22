@@ -1,17 +1,28 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "stivale2.h"
 #include "util.h"
+#include "kprint.h"
+#include "idt.h"
+#include "pic.h"
+#include "paging.h"
 
 // Reserve space for the stack
 static uint8_t stack[8192];
+
+// Unmap page 0
+static struct stivale2_tag unmap_null_hdr_tag = {
+  .identifier = STIVALE2_HEADER_TAG_UNMAP_NULL_ID,
+  .next = 0
+};
 
 // Request a terminal from the bootloader
 static struct stivale2_header_tag_terminal terminal_hdr_tag = {
 	.tag = {
     .identifier = STIVALE2_HEADER_TAG_TERMINAL_ID,
-    .next = 0
+    .next = (uintptr_t)&unmap_null_hdr_tag
   },
   .flags = 0
 };
@@ -55,9 +66,6 @@ void* find_tag(struct stivale2_struct* hdr, uint64_t id) {
 	return NULL;
 }
 
-typedef void (*term_write_t)(const char*, size_t);
-term_write_t term_write = NULL;
-
 void term_setup(struct stivale2_struct* hdr) {
   // Look for a terminal tag
   struct stivale2_struct_tag_terminal* tag = find_tag(hdr, STIVALE2_STRUCT_TAG_TERMINAL_ID);
@@ -66,117 +74,86 @@ void term_setup(struct stivale2_struct* hdr) {
   if (tag == NULL) halt();
 
   // Save the term_write function pointer
-	term_write = (term_write_t)tag->term_write;
+	set_term_write((term_write_t)tag->term_write);
 }
 
-/*
-   * Printing functions
- */
+/* 
+ * Mapping functions
+*/
 
-// Print one char
-void kprint_c(char c) {
-    term_write(&c, 1);
-}
+uintptr_t hhdm_addr;
 
-// Print string
-void kprint_s(const char* str) {
-    // Iterate through string and print each char
-    while (*str != '\0') {
-        kprint_c(*str);
-        str += 1;
+void memmap_print(struct stivale2_struct* hdr) {
+  // Find memmap tag
+  struct stivale2_struct_tag_memmap* tag = find_tag(hdr, STIVALE2_STRUCT_TAG_MEMMAP_ID);
+  struct stivale2_struct_tag_hhdm* hhdm = find_tag(hdr, STIVALE2_STRUCT_TAG_HHDM_ID);
+
+  hhdm_addr = hhdm->addr;
+  
+  // Make sure we actually found it
+  if (tag == NULL) halt();
+  if (hhdm == NULL) halt();
+
+  kprintf("Usable Memory:\n");
+  
+  // Print off memory regions
+  for (int i = 0; i < tag->entries; i++) {
+    if (tag->memmap[i].type == 1) {
+      kprintf("  %p-%p mapped at %p-%p\n", 
+        tag->memmap[i].base, tag->memmap[i].base + tag->memmap[i].length, hhdm->addr + tag->memmap[i].base, hhdm->addr + tag->memmap[i].base + tag->memmap[i].length);
     }
+  } 
 }
 
-// Print uint64
-void kprint_d(uint64_t value) {
-    // Store digit values
-    char buffer[21] = { '\0' };
-    int curr = 19;
-
-    // Iterate through each digit.
-    // Based off of:
-    // https://stackoverflow.com/questions/3389264/how-to-get-the-separate-digits-of-an-int-number
-    while (value > 0) {
-        int d = value % 10;
-        value /= 10;
-        char c = d + 48; // 48 = 0 in ascii
-        buffer[curr--] = c;
-    }
-
-    // Strip leading white spaces
-    char* str = buffer;
-    while (*str == '\0') {
-        str++;
-    }
-
-    // Print
-    kprint_s(str);
-}
-
-// Print hex
-void kprint_x(uint64_t value) {
-    // Store values
-    char buffer[21] = { '\0' };
-    int curr = 19;
-
-    // Iterate through each digit:
-    while (value > 0) {
-        int d = value % 16;
-
-        char c;
-
-        // Convert to char
-        if (d == 10) {
-            c = 'A';
-        } else if (d == 11) {
-            c = 'B';
-        } else if (d == 12) {
-            c = 'C';
-        } else if (d == 13) {
-            c = 'D';
-        } else if (d == 14) {
-            c = 'E';
-        } else if (d == 15) {
-            c = 'F';
-        } else {
-            c = d + 48; // Again add for ascii
-        }
-
-        // Divide d
-        value /= 16;
-
-        // Add to buffer
-        buffer[curr--] = c;
-    }
-
-    // Strip whitespace
-    char* str = buffer;
-    while (*str == '\0') {
-        str++;
-    }
-
-    // Print
-    kprint_s(str);
-}
-
-// Print pointer
-void kprint_p(void* ptr) {
-    kprint_s("0x");
-    kprint_x((uint64_t)ptr);
-}
 
 void _start(struct stivale2_struct* hdr) {
   // We've booted! Let's start processing tags passed to use from the bootloader
   term_setup(hdr);
 
-  // Print a greeting
-  term_write("Hello Kernel!\n", 14);
+  // Initialize pic
+  pic_init();
+  
+  // Unmask
+  pic_unmask_irq(1);
 
-  char c;
+  // Set up idt
+  idt_setup();
 
-  kprint_d(12345);
-  kprint_c('\n');
-  kprint_p(&c);
+  memmap_print(hdr);
+
+  // Initialize free list
+  init_list(hdr);
+
+  // Get page table
+  uintptr_t table = hhdm_addr + read_cr3();
+
+  // Test translate
+  translate(table, _start);
+
+  // Test vm map
+  uintptr_t root = read_cr3() & 0xFFFFFFFFFFFFF000;
+  int* p = (int*)0x50104020;
+  bool result = vm_map(root, (uintptr_t)p, false, true, false);
+  if (result) {
+    *p = 123;
+    kprintf("Stored %d at %p\n", *p, p);
+  } else {
+    kprintf("vm_map failed with an error\n");
+  }
+
+
+  // Test buffer
+  for (int i = 0; i < 600; i++) {
+    char c = kgetc();
+    kprintf("%c", c);
+  }
+
+
+  // Test exceptions
+  //int* p = (int*)0x1;
+  //*p = 123;
+
+  //__asm__("int $3");
 
 	// We're done, just hang...
 	halt();
