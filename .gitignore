@@ -2,5 +2,4 @@ limine
 boot.iso
 kernel/kernel.elf
 kernel/obj
-.swp
-.tmp
+kernel/*.swp
