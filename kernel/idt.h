@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define SYS_write 1
+#define SYS_read 0
+
 typedef struct interrupt_context {
   uintptr_t ip;
   uint64_t cs;
@@ -32,6 +35,9 @@ typedef struct idt_entry {
   uint32_t _unused_2;
 } __attribute__((packed)) idt_entry_t;
 
+// Syscall to read in from stdin currently
+int syscall_read(int fd, void* buf, size_t n);
+
 /**
  * Set an interrupt handler for the given interrupt number.
  *
@@ -47,6 +53,12 @@ typedef struct idt_record {
   uint16_t size;
   void* base;
 } __attribute__((packed)) idt_record_t;
+
+// We need to be able to perform syscalls
+//   DON'T CALL WITH MORE THAN 6 ARGS
+extern int64_t syscall(uint64_t nr, ...);
+
+extern void syscall_entry();
 
 /**
  * Initialize an interrupt descriptor table, set handlers for standard exceptions, and install

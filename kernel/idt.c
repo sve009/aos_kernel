@@ -93,6 +93,60 @@ void irq1_handler(interrupt_context_t* ctx) {
   outb(PIC1_COMMAND, PIC_EOI);
 }
 
+// Read at kernel level
+int syscall_read(int fd, void* buf, size_t n) {
+  // Check fd
+  if (fd != 0) {
+    return -1;
+  }
+
+  // Count chars
+  int accum = 0;
+
+  while (accum < n) {
+    // Read char
+    char c = kgetc();
+
+    // Write to buffer
+    ((char*)buf)[accum++] = c;
+
+    // Handle backspace
+    if (c == '\b') {
+      accum -= 2;
+    }
+  }
+}
+
+// Write at kernel level
+int syscall_write(int fd, char* buf) {
+  // If not stdout or stderr return
+  if (fd != 1 || fd != 2) {
+    return -1;
+  }
+
+  kprintf("%s", buf);
+}
+
+
+
+int64_t syscall_handler(uint64_t nr, uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5) {
+  kprintf("syscall %d: %d, %d, %d, %d, %d, %d\n", nr, arg0, arg1, arg2, arg3, arg4, arg5);
+
+  // Read syscall
+  if (nr == SYS_read) {
+    syscall_read(arg0, (void*)arg1, arg2);  
+  }
+
+  // Write syscall
+  if (nr == SYS_write) {
+    syscall_write(arg0, (char*)arg1);  
+  }
+
+  return 123;
+}
+
+
+
 // Every interrupt handler must specify a code selector. We'll use entry 5 (5*8=0x28), which
 // is where our bootloader set up a usable code selector for 64-bit mode.
 #define IDT_CODE_SELECTOR 0x28
@@ -186,6 +240,7 @@ void idt_setup() {
   idt_set_handler(13, segfault, IDT_TYPE_INTERRUPT);
   idt_set_handler(14, segfault, IDT_TYPE_INTERRUPT);
   idt_set_handler(IRQ1_INTERRUPT, irq1_handler, IDT_TYPE_INTERRUPT);
+  idt_set_handler(0x80, syscall_entry, IDT_TYPE_TRAP); // syscalls
 
   kprintf("Handler: %p\n", example_handler_ec); // What the fuck?
 

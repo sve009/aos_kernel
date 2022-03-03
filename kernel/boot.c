@@ -9,6 +9,7 @@
 #include "pic.h"
 #include "paging.h"
 
+
 // Reserve space for the stack
 static uint8_t stack[8192];
 
@@ -141,6 +142,14 @@ void _start(struct stivale2_struct* hdr) {
     kprintf("vm_map failed with an error\n");
   }
 
+  char buf[6];
+  long rc = syscall(SYS_read, 0, buf, 5);
+  if (rc <= 0) {
+    kprintf("read failed\n");
+  } else {
+    buf[rc] = '\0';
+    kprintf("read '%s'\n", buf);
+  }
 
   // Test buffer
   for (int i = 0; i < 600; i++) {
