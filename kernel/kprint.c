@@ -1,5 +1,7 @@
 #include "kprint.h"
 
+#include "term.h"
+
 #include <stdarg.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -22,7 +24,7 @@ void set_term_write(term_write_t fn) {
 
 // Print one char
 void kprint_c(char c) {
-    term_write(&c, 1);
+    term_putchar(c);
 }
 
 // Print string

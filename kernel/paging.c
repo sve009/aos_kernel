@@ -15,14 +15,22 @@ void init_hhdm(intptr_t p) {
   hhdm = p;
 }
 
-
+// Reset cacheing when changing page table
+void invalidate_tlb(uintptr_t virtual_address) {
+   __asm__("invlpg (%0)" :: "r" (virtual_address) : "memory");
+}
 
 // Page table entry
 typedef struct pte {
   bool present : 1;
   bool writable : 1;
   bool user : 1;
-  uint16_t unused : 9;
+  bool write_through: 1;
+  bool cache_disable: 1;
+  bool accessed: 1;
+  bool dirty: 1;
+  bool page_size: 1;
+  uint8_t unused : 4;
   uint64_t address : 51;
   bool no_execute : 1;
 } __attribute__((packed)) pte_t;
@@ -33,6 +41,61 @@ uintptr_t read_cr3() {
   __asm__("mov %%cr3, %0" : "=r" (value));
   return value;
 }
+
+// Write location of top-level page table
+void write_cr3(uint64_t value) {
+  __asm__("mov %0, %%cr3" : : "r" (value));
+}
+
+// Conver physical to virtual address
+uintptr_t ptov(uintptr_t v) {
+  return v + hhdm;
+}
+
+
+// Unmap everything in the lower half of an address space with level 4 page table at address root
+void unmap_lower_half(uintptr_t root) {
+  // We can reclaim memory used to hold page tables, but NOT the mapped pages
+  pte_t* l4_table = (pte_t*)ptov(root);
+  for (size_t l4_index = 0; l4_index < 256; l4_index++) {
+    // Does this entry point to a level 3 table?
+    if (l4_table[l4_index].present) {
+      // Yes. Mark the entry as not present in the level 4 table
+      l4_table[l4_index].present = false;
+
+      // Now loop over the level 3 table
+      pte_t* l3_table = (pte_t*)ptov(l4_table[l4_index].address << 12);
+      for (size_t l3_index = 0; l3_index < 512; l3_index++) {
+
+        // Does this entry point to a level 2 table?
+        if (l3_table[l3_index].present && !l3_table[l3_index].page_size) {
+          // Yes. Loop over the level 2 table
+          pte_t* l2_table = (pte_t*)ptov(l3_table[l3_index].address << 12);
+          for (size_t l2_index = 0; l2_index < 512; l2_index++) {
+
+            // Does this entry point to a level 1 table?
+            if (l2_table[l2_index].present && !l2_table[l2_index].page_size) {
+              // Yes. Free the physical page the holds the level 1 table
+              // SAM: Segfaults here (FIXED)
+              pmem_free(l2_table[l2_index].address << 12);
+            }
+          }
+
+          // Free the physical page that held the level 2 table
+          pmem_free(l3_table[l3_index].address << 12);
+        }
+      }
+
+      // Free the physical page that held the level 3 table
+      pmem_free(l4_table[l4_index].address << 12);
+    }
+  }
+
+  // Reload CR3 to flush any cached address translations
+  write_cr3(read_cr3());
+}
+
+
 
 /**
  * Translate a virtual address to its mapped physical address
@@ -52,18 +115,15 @@ void translate(uintptr_t page_table, void* address) {
     // Print
     kprintf("Level %d (index %d of %p)\n", 4 - i, index, page_table);
 
-    pte_t entry = ((pte_t*)page_table)[index];
+    pte_t entry = ((pte_t*)(page_table + hhdm))[index];
 
     // Mask off bottom bits
     uintptr_t next = entry.address << 12;
     next = next & 0xFFFFFFFFFFFFF000;
 
     // Change table
-    page_table = (hhdm + next);
+    page_table = next;
   }
-
-  // Update page table
-  page_table = page_table - hhdm;
 
   // Look up final address
   kprintf("Final: %p\n", page_table + offset);
@@ -129,8 +189,6 @@ void init_list(struct stivale2_struct* hdr) {
       }
     }
   } 
-
-  kprintf("Initialized %d pages\n", accum);
 }
 
 
@@ -150,7 +208,7 @@ uintptr_t pmem_alloc() {
 // p physical
 void pmem_free(uintptr_t p) {
   // Stick onto front of list
-  struct node* n = (struct node*)p;
+  struct node* n = (struct node*)(p + hhdm);
   n->next = free_list;
   free_list = n;
 }
@@ -171,41 +229,48 @@ bool vm_map(uintptr_t root, uintptr_t address, bool user, bool writable, bool ex
   // Iterate through table levels
   for (int i = 3; i >= 0; i--) {
     // Fetch entry
-    pte_t e = ((pte_t*)root)[indices[i]];
+    //   Oof ouch this line hurt me so much. I used pte_t e without &
+    //   and updated it in memory without actually updating it
+    //   and it took literally weeks to find
+    //   and I am sad
+    //   very sad
+    pte_t* e = &((pte_t*)(root + hhdm))[indices[i]];
 
     // Special already present case
-    if (i == 0 && e.present) {
+    if (i == 0 && e->present) {
       return false; // Already mapped
     }
 
     // Nonexistant case
-    if (!e.present) {
+    if (!e->present) {
       // Get new page + zero it
-      
       uintptr_t p = pmem_alloc();
       memset((void*)p, 4096);
 
       // Update entry
-      e.present = 1;
-      e.user = 1;
-      e.writable = 1;
+      e->present = 1;
+      e->user = 1;
+      e->writable = 1;
 
       // Last level case
       if (i == 0) {
         // Set permissions
-        e.writable = writable;
-        e.user = user;
-        e.no_execute = !executable;
+        e->writable = writable;
+        e->user = user;
+        e->no_execute = !executable;
       }
 
       // Either p or p >> 12
-      e.address = p >> 12;
+      e->address = (p - hhdm) >> 12;
     }
 
     // Update root to new table
     //  (+ hhdm or no?)
-    root = (e.address << 12) + hhdm;
+    root = (e->address << 12);
   }
+
+  // Reset translation cacheing
+  invalidate_tlb(address);
 
   // Now in the offset
   return true;
@@ -222,16 +287,20 @@ bool vm_unmap(uintptr_t root, uintptr_t address) {
 
   for (int i = 3; i >= 0; i++) {
     // Grab table entry
-    pte_t entry = ((pte_t*)(root + hhdm))[indices[i]];
+    pte_t* entry = &((pte_t*)(root + hhdm))[indices[i]];
 
     // Special end case
     if (i == 0) {
-      entry.present = false;
+      entry->present = false;
     }
 
     // Update root
-    root = (entry.address << 12);
+    root = (entry->address << 12);
   }
+
+  // Reset cacheing
+  invalidate_tlb(address);
+
   return true;
 }
 
@@ -259,5 +328,9 @@ bool vm_protect(uintptr_t root, uintptr_t address, bool user, bool writable, boo
     // Update root
     root = (entry.address << 12);
   }
+
+  // Reset cacheing
+  invalidate_tlb(address);
+
   return true;
 }

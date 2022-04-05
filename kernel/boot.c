@@ -8,6 +8,8 @@
 #include "idt.h"
 #include "pic.h"
 #include "paging.h"
+#include "elf.h"
+#include "term.h"
 
 
 // Reserve space for the stack
@@ -67,6 +69,53 @@ void* find_tag(struct stivale2_struct* hdr, uint64_t id) {
 	return NULL;
 }
 
+// Print out module locations
+void print_mods(struct stivale2_struct* hdr) {
+  struct stivale2_struct_tag_modules* tag = find_tag(hdr, 0x4b6fe466aade04ce);
+  kprintf("Modules:\n");
+  for (int i = 0; i < tag->module_count; i++) {
+    kprintf("  %s 0x%x-0x%x\n", tag->modules[i].string, tag->modules[i].begin, tag->modules[i].end);
+  }
+}
+
+typedef void call_t(void);
+
+void execute_mods(struct stivale2_struct* hdr) {
+  struct stivale2_struct_tag_modules* tag = find_tag(hdr, 0x4b6fe466aade04ce);
+  kprintf("Modules:\n");
+  for (int i = 0; i < tag->module_count; i++) {
+    kprintf("  %s 0x%x-0x%x\n", tag->modules[i].string, tag->modules[i].begin, tag->modules[i].end);
+
+    // Get header
+    Elf64_Ehdr* ehdr = (Elf64_Ehdr*)tag->modules[i].begin;
+
+    // Get program header
+    Elf64_Phdr* phdr = (Elf64_Phdr*)((uintptr_t)ehdr + (uintptr_t)ehdr->e_phoff);
+
+    // Table
+    uintptr_t root = read_cr3() & 0xFFFFFFFFFFFFF000;
+
+    // Load segments
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+      // If type == LOAD
+      // TODO: Might need multiple pages
+      if (phdr[i].p_type == 1) {
+        // Address:
+        vm_map(root, (uintptr_t)phdr[i].p_vaddr, true, true, true);
+
+        memcpy(phdr[i].p_vaddr, (void*)((uintptr_t)ehdr + (uintptr_t)phdr[i].p_offset), phdr[i].p_memsz);
+      }
+    }
+
+    // Start executing
+    call_t* entry = (call_t*)ehdr->e_entry; 
+    entry();
+  }
+}
+
+  
+
+
 void term_setup(struct stivale2_struct* hdr) {
   // Look for a terminal tag
   struct stivale2_struct_tag_terminal* tag = find_tag(hdr, STIVALE2_STRUCT_TAG_TERMINAL_ID);
@@ -109,7 +158,29 @@ void memmap_print(struct stivale2_struct* hdr) {
 
 void _start(struct stivale2_struct* hdr) {
   // We've booted! Let's start processing tags passed to use from the bootloader
-  term_setup(hdr);
+
+  // Initialize free list (And hhdm tag)
+  init_list(hdr);
+
+  // Get page table location
+  uintptr_t root = read_cr3() & 0xFFFFFFFFFFFFF000;
+
+  // Set up terminal
+  term_init();
+
+  kprintf("Terminal initialized\n");
+
+  kprintf("Setting up idt\n");
+
+  // Set up idt
+  idt_setup();
+
+  // Unmap the lower half
+  unmap_lower_half(root);
+
+  // Update where we are
+
+  kprintf("Initializing pic\n");
 
   // Initialize pic
   pic_init();
@@ -117,24 +188,23 @@ void _start(struct stivale2_struct* hdr) {
   // Unmask
   pic_unmask_irq(1);
 
-  // Set up idt
-  idt_setup();
+
+  kprintf("Printing memory and mods\n");
 
   memmap_print(hdr);
+  print_mods(hdr);
 
-  // Initialize free list
-  init_list(hdr);
+
 
   // Get page table
-  uintptr_t table = hhdm_addr + read_cr3();
+  uintptr_t table = read_cr3();
 
   // Test translate
-  translate(table, _start);
+  //translate(table, _start);
 
   // Test vm map
-  uintptr_t root = read_cr3() & 0xFFFFFFFFFFFFF000;
-  int* p = (int*)0x50104020;
-  bool result = vm_map(root, (uintptr_t)p, false, true, false);
+  int* p = (int*)0x501040200;
+  bool result = vm_map(root, (uintptr_t)p, true, true, true);
   if (result) {
     *p = 123;
     kprintf("Stored %d at %p\n", *p, p);
@@ -142,6 +212,15 @@ void _start(struct stivale2_struct* hdr) {
     kprintf("vm_map failed with an error\n");
   }
 
+  kprintf("Running executable\n");
+
+  // Test running mods
+  execute_mods(hdr);
+
+  // Test syscall write
+  syscall(SYS_write, 1, "Hello\n", 7);
+
+  // Test syscall read
   char buf[6];
   long rc = syscall(SYS_read, 0, buf, 5);
   if (rc <= 0) {

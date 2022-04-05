@@ -63,8 +63,16 @@ void divide_zero(interrupt_context_t* ctx, uint64_t ec) {
   halt();
 }
 
+// Get location of top-level page table
+uintptr_t read_cr2() {
+  uintptr_t value;
+  __asm__("mov %%cr2, %0" : "=r" (value));
+  return value;
+}
+
 __attribute__((interrupt))
 void segfault(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("cr2 = %p\n", read_cr2());
   kprintf("Segfault (ec=%d)\n", ec);
   halt();
 }
@@ -115,16 +123,23 @@ int syscall_read(int fd, void* buf, size_t n) {
       accum -= 2;
     }
   }
+
+  return n;
 }
 
 // Write at kernel level
-int syscall_write(int fd, char* buf) {
+int syscall_write(int fd, char* buf, size_t n) {
   // If not stdout or stderr return
-  if (fd != 1 || fd != 2) {
+  if (fd != 1 && fd != 2) {
     return -1;
   }
 
-  kprintf("%s", buf);
+  // Write from buffer
+  for (int i = 0; i < n; i++) {
+    kprintf("%c", buf[i]);
+  }
+
+  return n;
 }
 
 
@@ -134,12 +149,12 @@ int64_t syscall_handler(uint64_t nr, uint64_t arg0, uint64_t arg1, uint64_t arg2
 
   // Read syscall
   if (nr == SYS_read) {
-    syscall_read(arg0, (void*)arg1, arg2);  
+    return syscall_read(arg0, (void*)arg1, arg2);  
   }
 
   // Write syscall
   if (nr == SYS_write) {
-    syscall_write(arg0, (char*)arg1);  
+    return syscall_write(arg0, (char*)arg1, arg2);  
   }
 
   return 123;

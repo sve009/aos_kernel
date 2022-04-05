@@ -5,11 +5,22 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// Read top level page table address
 uintptr_t read_cr3();
 
+// Write top level page table address
+void write_cr3(uint64_t value);
+
+// Write to global var
 void init_hhdm(intptr_t p);
 
+// Conver physical to virtual address
+uintptr_t ptov(uintptr_t v);
+
 void translate(uintptr_t page_table, void* address);
+
+// Unmap everything in the lower half of an address space with level 4 page table at address root
+void unmap_lower_half(uintptr_t root);
 
 // Initialize the free list by grabbing all available memory
 void init_list(struct stivale2_struct* hdr);
