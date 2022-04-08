@@ -7,6 +7,9 @@
 #include "util.h"
 #include "pic.h"
 #include "port.h"
+#include "gdt.h"
+#include "paging.h"
+#include "proc.h"
 
 // Retrieved from:
 //  https://stackoverflow.com/questions/61124564/convert-scancodes-to-ascii
@@ -58,8 +61,134 @@ void example_handler_ec(interrupt_context_t* ctx, uint64_t ec) {
 }
 
 __attribute__((interrupt))
-void divide_zero(interrupt_context_t* ctx, uint64_t ec) {
-  kprintf("Divide by zero error (ec=%d)\n", ec);
+void divide_zero(interrupt_context_t* ctx) {
+  kprintf("0: Divide by zero error\n");
+  halt();
+}
+
+__attribute__((interrupt))
+void exception1(interrupt_context_t* ctx) {
+  kprintf("1: Debug\n");
+  halt();
+}
+
+__attribute__((interrupt))
+void exception2(interrupt_context_t* ctx) {
+  kprintf("2: Non-maskable interrupt\n");
+  halt();
+}
+
+__attribute__((interrupt))
+void exception3(interrupt_context_t* ctx) {
+  kprintf("3: Breakpoint\n");
+  halt();
+}
+
+__attribute__((interrupt))
+void exception4(interrupt_context_t* ctx) {
+  kprintf("4: Overflow\n");
+  halt();
+}
+__attribute__((interrupt))
+void exception5(interrupt_context_t* ctx) {
+  kprintf("5: Bound Range Exceeded\n");
+  halt();
+}
+__attribute__((interrupt))
+void exception6(interrupt_context_t* ctx) {
+  kprintf("6: Invalid Opcode\n");
+  halt();
+}
+__attribute__((interrupt))
+void exception7(interrupt_context_t* ctx) {
+  kprintf("7: Device not available\n");
+  halt();
+}
+__attribute__((interrupt))
+void exception8(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("8: Double fault ec=%d\n", ec);
+  halt();
+}
+__attribute__((interrupt))
+void exception9(interrupt_context_t* ctx) {
+  kprintf("9: Coprocessor segment overrun\n");
+  halt();
+}
+__attribute__((interrupt))
+void exception10(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("10: Invalid TSS, ec=%d\n", ec);
+  halt();
+}
+
+__attribute__((interrupt))
+void exception11(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("11: Segment not present, ec=%d\n", ec);
+  halt();
+}
+
+__attribute__((interrupt))
+void exception12(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("12: Stack-Segment fault, ec=%d\n", ec);
+  halt();
+}
+
+__attribute__((interrupt))
+void exception13(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("13: General protection fault, ec=%d\n", ec);
+  halt();
+}
+
+__attribute__((interrupt))
+void exception16(interrupt_context_t* ctx) {
+  kprintf("16: x87 Floating point exception\n");
+  halt();
+}
+
+__attribute__((interrupt))
+void exception17(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("17: Alignment check, ec=%d\n", ec);
+  halt();
+}
+
+__attribute__((interrupt))
+void exception18(interrupt_context_t* ctx) {
+  kprintf("18: Machine check\n");
+  halt();
+}
+
+__attribute__((interrupt))
+void exception19(interrupt_context_t* ctx) {
+  kprintf("19: SIMD floating point exception\n");
+  halt();
+}
+
+__attribute__((interrupt))
+void exception20(interrupt_context_t* ctx) {
+  kprintf("20: Virtualization exception\n");
+  halt();
+}
+
+__attribute__((interrupt))
+void exception21(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("21: Control protection exception, ec=%d\n", ec);
+  halt();
+}
+
+__attribute__((interrupt))
+void exception28(interrupt_context_t* ctx) {
+  kprintf("28: Hypervisor injection exception\n");
+  halt();
+}
+
+__attribute__((interrupt))
+void exception29(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("29: VMM communication exception, ec=%d\n", ec);
+  halt();
+}
+
+__attribute__((interrupt))
+void exception30(interrupt_context_t* ctx, uint64_t ec) {
+  kprintf("30: Security exception, ec=%d\n", ec);
   halt();
 }
 
@@ -73,7 +202,7 @@ uintptr_t read_cr2() {
 __attribute__((interrupt))
 void segfault(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("cr2 = %p\n", read_cr2());
-  kprintf("Segfault (ec=%d)\n", ec);
+  kprintf("14: Page fault (ec=%d)\n", ec);
   halt();
 }
 
@@ -142,7 +271,12 @@ int syscall_write(int fd, char* buf, size_t n) {
   return n;
 }
 
+// Keep track of virtual address space heap
+uint64_t v_heap = 0x10000;
 
+void reset_v_heap() {
+  v_heap = 0x10000;
+}
 
 int64_t syscall_handler(uint64_t nr, uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5) {
   kprintf("syscall %d: %d, %d, %d, %d, %d, %d\n", nr, arg0, arg1, arg2, arg3, arg4, arg5);
@@ -155,6 +289,25 @@ int64_t syscall_handler(uint64_t nr, uint64_t arg0, uint64_t arg1, uint64_t arg2
   // Write syscall
   if (nr == SYS_write) {
     return syscall_write(arg0, (char*)arg1, arg2);  
+  }
+
+  // Mmap syscall
+  if (nr == 2) {
+    vm_map(read_cr3(), v_heap, 1, 1, 1);
+    *(uint64_t*)arg0 = v_heap;
+    v_heap += PAGE_SIZE;
+  }
+
+  // Exec syscall
+  if (nr == 3) {
+    unmap_lower_half(read_cr3());
+    execute_mod((char*)arg0);    
+  }
+
+  // Exit syscall
+  if (nr == 4) {
+    unmap_lower_half(read_cr3());
+    execute_mod("init");    
   }
 
   return 123;
@@ -217,13 +370,13 @@ void idt_set_handler(uint8_t index, void* fn, uint8_t type) {
   idt[index].present = 1;
 
   // DPL
-  idt[index].dpl = 0;
+  idt[index].dpl = 3;
 
   // IST
   idt[index].ist = 0;
 
   // Selector
-  idt[index].selector = IDT_CODE_SELECTOR;
+  idt[index].selector = KERNEL_CODE_SELECTOR;
 }
 
 
@@ -249,11 +402,30 @@ void idt_setup() {
   }
 
   idt_set_handler(0, divide_zero, IDT_TYPE_INTERRUPT);
-  idt_set_handler(3, example_handler, IDT_TYPE_INTERRUPT);
-  idt_set_handler(11, segfault, IDT_TYPE_INTERRUPT);
-  idt_set_handler(12, segfault, IDT_TYPE_INTERRUPT);
-  idt_set_handler(13, segfault, IDT_TYPE_INTERRUPT);
+  idt_set_handler(1, exception1, IDT_TYPE_INTERRUPT);
+  idt_set_handler(2, exception2, IDT_TYPE_INTERRUPT);
+  idt_set_handler(3, exception3, IDT_TYPE_TRAP);
+  idt_set_handler(4, exception4, IDT_TYPE_TRAP);
+  idt_set_handler(5, exception5, IDT_TYPE_INTERRUPT);
+  idt_set_handler(6, exception6, IDT_TYPE_INTERRUPT);
+  idt_set_handler(7, exception7, IDT_TYPE_INTERRUPT);
+  idt_set_handler(8, exception8, IDT_TYPE_INTERRUPT);
+  idt_set_handler(9, exception9, IDT_TYPE_INTERRUPT);
+  idt_set_handler(10, exception10, IDT_TYPE_INTERRUPT);
+  idt_set_handler(11, exception11, IDT_TYPE_INTERRUPT);
+  idt_set_handler(12, exception12, IDT_TYPE_INTERRUPT);
+  idt_set_handler(13, exception13, IDT_TYPE_INTERRUPT);
   idt_set_handler(14, segfault, IDT_TYPE_INTERRUPT);
+  idt_set_handler(16, exception16, IDT_TYPE_INTERRUPT);
+  idt_set_handler(17, exception17, IDT_TYPE_INTERRUPT);
+  idt_set_handler(18, exception18, IDT_TYPE_INTERRUPT);
+  idt_set_handler(19, exception19, IDT_TYPE_INTERRUPT);
+  idt_set_handler(20, exception20, IDT_TYPE_INTERRUPT);
+  idt_set_handler(21, exception21, IDT_TYPE_INTERRUPT);
+  idt_set_handler(28, exception28, IDT_TYPE_INTERRUPT);
+  idt_set_handler(29, exception29, IDT_TYPE_INTERRUPT);
+  idt_set_handler(30, exception30, IDT_TYPE_INTERRUPT);
+
   idt_set_handler(IRQ1_INTERRUPT, irq1_handler, IDT_TYPE_INTERRUPT);
   idt_set_handler(0x80, syscall_entry, IDT_TYPE_TRAP); // syscalls
 

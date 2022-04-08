@@ -1,11 +1,14 @@
 #include "paging.h"
 
 #include "kprint.h"
+#include "idt.h"
 #include "util.h"
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+
+#include <mem.h>
 
 // hhdm
 uintptr_t hhdm;
@@ -90,6 +93,9 @@ void unmap_lower_half(uintptr_t root) {
       pmem_free(l4_table[l4_index].address << 12);
     }
   }
+
+  // Reset virtual heap pointer
+  reset_v_heap();
 
   // Reload CR3 to flush any cached address translations
   write_cr3(read_cr3());

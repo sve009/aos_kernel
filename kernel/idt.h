@@ -6,6 +6,9 @@
 #define SYS_write 1
 #define SYS_read 0
 
+// Reset v_heap
+void reset_v_heap();
+
 typedef struct interrupt_context {
   uintptr_t ip;
   uint64_t cs;

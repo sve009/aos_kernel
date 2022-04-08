@@ -2,14 +2,18 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+
 #include "stivale2.h"
 #include "util.h"
 #include "kprint.h"
 #include "idt.h"
 #include "pic.h"
 #include "paging.h"
-#include "elf.h"
 #include "term.h"
+#include "gdt.h"
+#include "proc.h"
+
+#define PAGESIZE 2048
 
 
 // Reserve space for the stack
@@ -80,41 +84,6 @@ void print_mods(struct stivale2_struct* hdr) {
 
 typedef void call_t(void);
 
-void execute_mods(struct stivale2_struct* hdr) {
-  struct stivale2_struct_tag_modules* tag = find_tag(hdr, 0x4b6fe466aade04ce);
-  kprintf("Modules:\n");
-  for (int i = 0; i < tag->module_count; i++) {
-    kprintf("  %s 0x%x-0x%x\n", tag->modules[i].string, tag->modules[i].begin, tag->modules[i].end);
-
-    // Get header
-    Elf64_Ehdr* ehdr = (Elf64_Ehdr*)tag->modules[i].begin;
-
-    // Get program header
-    Elf64_Phdr* phdr = (Elf64_Phdr*)((uintptr_t)ehdr + (uintptr_t)ehdr->e_phoff);
-
-    // Table
-    uintptr_t root = read_cr3() & 0xFFFFFFFFFFFFF000;
-
-    // Load segments
-    for (int i = 0; i < ehdr->e_phnum; i++) {
-      // If type == LOAD
-      // TODO: Might need multiple pages
-      if (phdr[i].p_type == 1) {
-        // Address:
-        vm_map(root, (uintptr_t)phdr[i].p_vaddr, true, true, true);
-
-        memcpy(phdr[i].p_vaddr, (void*)((uintptr_t)ehdr + (uintptr_t)phdr[i].p_offset), phdr[i].p_memsz);
-      }
-    }
-
-    // Start executing
-    call_t* entry = (call_t*)ehdr->e_entry; 
-    entry();
-  }
-}
-
-  
-
 
 void term_setup(struct stivale2_struct* hdr) {
   // Look for a terminal tag
@@ -170,6 +139,10 @@ void _start(struct stivale2_struct* hdr) {
 
   kprintf("Terminal initialized\n");
 
+  kprintf("Setting up gdt\n");
+
+  gdt_setup();
+
   kprintf("Setting up idt\n");
 
   // Set up idt
@@ -187,6 +160,10 @@ void _start(struct stivale2_struct* hdr) {
   
   // Unmask
   pic_unmask_irq(1);
+
+  kprintf("Setting up processes\n");
+  struct stivale2_struct_tag_modules* tag = find_tag(hdr, 0x4b6fe466aade04ce);
+  set_hdr(tag);
 
 
   kprintf("Printing memory and mods\n");
@@ -215,7 +192,7 @@ void _start(struct stivale2_struct* hdr) {
   kprintf("Running executable\n");
 
   // Test running mods
-  execute_mods(hdr);
+  execute_mod("init");
 
   // Test syscall write
   syscall(SYS_write, 1, "Hello\n", 7);

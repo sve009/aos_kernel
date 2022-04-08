@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define PAGE_SIZE 2048
+
 // Read top level page table address
 uintptr_t read_cr3();
 
