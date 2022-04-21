@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <mystring.h>
+
 #include "kprint.h"
 #include "util.h"
 #include "pic.h"
@@ -279,8 +281,6 @@ void reset_v_heap() {
 }
 
 int64_t syscall_handler(uint64_t nr, uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5) {
-  kprintf("syscall %d: %d, %d, %d, %d, %d, %d\n", nr, arg0, arg1, arg2, arg3, arg4, arg5);
-
   // Read syscall
   if (nr == SYS_read) {
     return syscall_read(arg0, (void*)arg1, arg2);  
@@ -296,16 +296,32 @@ int64_t syscall_handler(uint64_t nr, uint64_t arg0, uint64_t arg1, uint64_t arg2
     vm_map(read_cr3(), v_heap, 1, 1, 1);
     *(uint64_t*)arg0 = v_heap;
     v_heap += PAGE_SIZE;
+    return 0;
   }
 
   // Exec syscall
   if (nr == 3) {
+    // Copy the string over
+    char copy[20] = { 0 };
+    strcpy(copy, (char*)arg0); 
+    // kprintf("copy: %s\n", copy);
+
+    // Return if program not found
+    if (check_mod(copy) < 0) {
+      return -1;
+    }
+
+    // Otherwise execute
     unmap_lower_half(read_cr3());
-    execute_mod((char*)arg0);    
+
+
+    execute_mod(copy);    
+    execute_mod("init");
   }
 
   // Exit syscall
   if (nr == 4) {
+    kprintf("Never gets here\n");
     unmap_lower_half(read_cr3());
     execute_mod("init");    
   }

@@ -11,6 +11,10 @@ clean:
 	$(MAKE) -C stdlib clean
 	$(MAKE) -C kernel clean
 	$(MAKE) -C init clean
+	$(MAKE) -C shell clean
+	$(MAKE) -C hello clean
+	$(MAKE) -C echo clean
+	$(MAKE) -C test clean
 
 .PHONY: stdlib
 stdlib:
@@ -24,14 +28,30 @@ kernel: stdlib
 init: stdlib
 	$(MAKE) -C init
 
+.PHONY: hello
+hello: stdlib
+	$(MAKE) -C hello
+
+.PHONY: echo
+echo: stdlib
+	$(MAKE) -C echo
+
+.PHONY: shell
+shell: stdlib
+	$(MAKE) -C shell
+
+.PHONY: test
+test: stdlib
+	$(MAKE) -C test
+
 limine:
 	git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch-binary --depth=1
 	$(MAKE) -C limine
 
-boot.iso: limine kernel init limine.cfg 
+boot.iso: limine kernel test init hello echo shell limine.cfg 
 	rm -rf iso_root
 	mkdir -p iso_root
-	cp kernel/kernel.elf init/init limine.cfg limine/limine.sys limine/limine-cd.bin limine/limine-eltorito-efi.bin iso_root/
+	cp kernel/kernel.elf test/test init/init hello/hello echo/echo shell/shell limine.cfg limine/limine.sys limine/limine-cd.bin limine/limine-eltorito-efi.bin iso_root/
 	xorriso -as mkisofs -b limine-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot limine-eltorito-efi.bin -efi-boot-part --efi-boot-image --protective-msdos-label iso_root -o boot.iso
 	limine/limine-install boot.iso
 	rm -rf iso_root

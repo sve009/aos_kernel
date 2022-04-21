@@ -1,0 +1,56 @@
+1. Input/Output: 3
+     Everything is working perfectly here lol. I've done enough
+     logging to guarantee that kprintf works well, and then I've used
+     code that reads in user input at several different places and
+     all work well. The only thing not implemented is shift + symbols.
+     Shift + letters works just fine.
+
+2. Exceptions: 3
+     The file can be checked, and I'll say that this was probably the
+     most tedious part of the project lol. There's just a lot of exceptions.
+     But yeah, both exceptions and interrupts are working.
+
+3. Virtual Memory: 3
+     I've extensively tested this one, storing and derefencing a value on a
+     virtual page that for sure wasn't mapped by default (because it was failing
+     for a long time until I fixed my vm_map). But yeah, it worked for pulling stored
+     values off a virtual page, and fails when trying to access something off limits
+     (I used to have a test in init.) vm_protect also for sure works because when I
+     was setting the executable permissions to not be readable for any of the segments
+     I would immediately get pagefaults from trying to access things marked as
+     off limits. But yeah, I know that this is working because it wasn't for so long for
+     the most part.
+
+4. System Calls: 3
+     The project has the capabilities for read, write, mmap, and exec system calls. I don't
+     feel like any of those could have been handled entirely in usermode, so I feel pretty
+     good about this one. 
+
+5. Loader: 3
+     Taking permissions into consideration was slightly difficult, but now the loader does indeed
+     load the correct segments of an elf file with the correct permissions. I know that it works
+     because I can run both the init, shell, hello, and echo programs.
+
+6. Standard Library: 2-3
+     It's pretty small. Everything works though! All those mentioned in the rubric are here, but the
+     standard library certainly is not a highlight of the project. Some of the implementations are
+     slighlty hacky, and sometimes behavior is not identical to the standard because I just gave
+     it the bare minimum functionality for what I ended up using it for.
+
+7. User Mode: 3
+     This for sure works, as most of the code was provided by you. I've also had issues involving unloading
+     the bottom half, so I know for sure that that's going through. Additionally, I've tried to access kernel
+     addresses from user mode in the init program, and that caused a page fault so that's good.
+
+8. Processes: 3
+     This uses the same code as the loader, generalized for both situations. It seems to work very well, as
+     everything can be run successfully at this point. The my_exit function is also finally working.
+
+9. Shell: 3
+     Yep it does everything required. Super basic implementation. Gives errors if no program can be found and runs
+     a program of the given name if one is found.
+
+10. Code Quality: 2
+     I think that my project structure makes a lot of sense, but I'm sure that I slipped and got a little bit
+     lazy about commenting in some places. However, I don't think most of the code is pretty straightforward,
+     and there are no huge segments so overall I'd describe it as pretty highly readable.

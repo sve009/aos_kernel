@@ -291,7 +291,7 @@ bool vm_unmap(uintptr_t root, uintptr_t address) {
     (address >> 39) & 0x1ff
   };
 
-  for (int i = 3; i >= 0; i++) {
+  for (int i = 3; i >= 0; i--) {
     // Grab table entry
     pte_t* entry = &((pte_t*)(root + hhdm))[indices[i]];
 
@@ -319,20 +319,25 @@ bool vm_protect(uintptr_t root, uintptr_t address, bool user, bool writable, boo
     (address >> 39) & 0x1ff
   };
 
-  for (int i = 3; i >= 0; i++) {
+  for (int i = 3; i >= 0; i--) {
     // Grab table entry
-    pte_t entry = ((pte_t*)(root + hhdm))[indices[i]];
+    pte_t* e = &((pte_t*)(root + hhdm))[indices[i]];
+
+    // If entry doesn't exist fail
+    if (!e->present) {
+      return false;
+    }
 
     // Special end case
     if (i == 0) {
       // TODO: User
-      entry.writable = writable;
-      entry.user = user;
-      entry.no_execute = !executable;
+      e->writable = writable;
+      e->user = user;
+      e->no_execute = !executable;
     }
 
     // Update root
-    root = (entry.address << 12);
+    root = (e->address << 12);
   }
 
   // Reset cacheing

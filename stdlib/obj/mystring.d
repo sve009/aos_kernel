@@ -1,1 +1,3 @@
-obj/mystring.o: mystring.c
+obj/mystring.o: mystring.c mystring.h
+
+mystring.h:
