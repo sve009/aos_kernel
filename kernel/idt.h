@@ -12,7 +12,7 @@ void reset_v_heap();
 typedef struct interrupt_context {
   uintptr_t ip;
   uint64_t cs;
-  uint64_t flags;
+  uint64_t flags; // Change this to get in single instruction mode
   uintptr_t sp;
   uint64_t ss;
 } __attribute__((packed)) interrupt_context_t;

@@ -6,6 +6,7 @@
 
 #include "port.h"
 #include "kprint.h"
+#include "debug.h"
 
 #define ICW1_ICW4 0x01
 #define ICW1_SINGLE 0x02

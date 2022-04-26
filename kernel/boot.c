@@ -12,6 +12,7 @@
 #include "term.h"
 #include "gdt.h"
 #include "proc.h"
+#include "debug.h"
 
 #define PAGESIZE 2048
 
@@ -169,6 +170,7 @@ void _start(struct stivale2_struct* hdr) {
   kprintf("Printing memory and mods\n");
 
   memmap_print(hdr);
+  BREAK;
   print_mods(hdr);
 
 

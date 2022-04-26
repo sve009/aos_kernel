@@ -80,10 +80,16 @@ void exception2(interrupt_context_t* ctx) {
   halt();
 }
 
+/**
+ * This one will probably be important
+ */
 __attribute__((interrupt))
 void exception3(interrupt_context_t* ctx) {
+  kprintf("Pointer: %p\n", ctx->ip);
   kprintf("3: Breakpoint\n");
-  halt();
+  kprintf("Press anything to continue\n");
+  char c = kgetc();
+  kprintf("Char: %c\n");
 }
 
 __attribute__((interrupt))
