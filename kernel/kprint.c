@@ -120,6 +120,11 @@ void kprint_x(uint64_t value) {
     kprint_s(str);
 }
 
+// Print limited hex
+void kprint_xd(uint16_t v) {
+  kprint_x(v);
+}
+
 // Print pointer
 void kprint_p(void* ptr) {
     kprint_s("0x");
@@ -154,7 +159,7 @@ void kprintf(const char* format, ...) {
         case 's': kprint_s(va_arg(args, char*)); break;
         case 'd': kprint_d(va_arg(args, int)); break;
         case 'p': kprint_p(va_arg(args, void*)); break;
-        case 'x': kprint_x(va_arg(args, int)); break;
+        case 'x': kprint_xd(va_arg(args, int)); break;
         case 'c': kprint_c(va_arg(args, char)); break;
         default: flag = false; continue;
       }
