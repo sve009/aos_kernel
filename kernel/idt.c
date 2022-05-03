@@ -68,10 +68,24 @@ void divide_zero(interrupt_context_t* ctx) {
   halt();
 }
 
+int i = 0;
+
 __attribute__((interrupt))
 void exception1(interrupt_context_t* ctx) {
   kprintf("1: Debug\n");
-  halt();
+  kprintf("Called debug %d times", ++i);
+  kprintf("Press anything to continue\n");
+  //char c = kgetc();
+  //kprintf("Char: %c\n");
+
+  int test = 55;
+
+  dump_mem(&test);
+
+  // Turn on single step
+  kprintf("Flags: %p\n", ctx->flags);
+  ctx->flags = ctx->flags | 0x100;
+  kprintf("Flags: %p\n", ctx->flags);
 }
 
 __attribute__((interrupt))
@@ -90,6 +104,15 @@ void exception3(interrupt_context_t* ctx) {
   kprintf("Press anything to continue\n");
   char c = kgetc();
   kprintf("Char: %c\n");
+
+  int test = 55;
+
+  dump_mem(&test);
+
+  // Turn on single step
+  kprintf("Flags: %p\n", ctx->flags);
+  ctx->flags = ctx->flags | 0x100;
+  kprintf("Flags: %p\n", ctx->flags);
 }
 
 __attribute__((interrupt))

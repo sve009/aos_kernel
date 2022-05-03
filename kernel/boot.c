@@ -172,6 +172,7 @@ void _start(struct stivale2_struct* hdr) {
   memmap_print(hdr);
   BREAK;
   print_mods(hdr);
+  BREAK;
 
 
 
