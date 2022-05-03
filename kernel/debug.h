@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#define BREAK __asm__("int $1")
+#define BREAK __asm__("int $3")
 
 #define HEXDUMP 0
 #define DECDUMP 1
