@@ -11,4 +11,16 @@
  * Dump a region of memory starting at a given
  * point for debugging purposes.
  */
-void dump_mem(uint64_t p, int flag);
+void dump_mem(uint64_t p, int flag, int rows, int cols);
+
+/**
+ * Prints out single integer value
+ */
+void print_int(uint64_t p);
+
+/**
+ * Dumps out contents of top of stack
+ *
+ * CAUTION: Simply an estimate
+ */
+void dump_stack();

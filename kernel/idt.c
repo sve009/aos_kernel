@@ -106,7 +106,11 @@ void exception3(interrupt_context_t* ctx) {
 
   int test = 55;
 
-  dump_mem(&test, HEXDUMP);
+  //dump_mem(&test, HEXDUMP);
+  print_int(&test);
+
+  kprintf("Stack dump\n");
+  dump_stack();
 
   // Turn on single step
   kprintf("Flags: %p\n", ctx->flags);
