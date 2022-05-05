@@ -19,6 +19,9 @@ typedef struct {
   uint16_t e_shstrndx;
 } __attribute__((packed)) Elf64_Ehdr;
 
+// Note for type:
+// 2 = symbol table
+// 3 = string table
 typedef struct {
 	uint64_t sh_name;
 	uint64_t sh_type;
@@ -31,6 +34,15 @@ typedef struct {
 	uint64_t sh_addralign;
 	uint64_t sh_entsize;
 } __attribute__((packed)) Elf64_Shdr;
+
+typedef struct {
+	uint64_t	st_name;
+	unsigned char	st_info;
+	unsigned char	st_other;
+	uint32_t	st_shndx;
+	uint64_t	st_value;
+	uint64_t	st_size;
+} __attribute__((packed)) Elf64_Sym;
 
 typedef struct {
   uint32_t p_type;
