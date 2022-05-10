@@ -16,6 +16,8 @@
 
 #define PAGESIZE 2048
 
+int test_global = 5;
+
 
 // Reserve space for the stack
 static uint8_t stack[8192];
@@ -165,6 +167,11 @@ void _start(struct stivale2_struct* hdr) {
   kprintf("Setting up processes\n");
   struct stivale2_struct_tag_modules* tag = find_tag(hdr, 0x4b6fe466aade04ce);
   set_hdr(tag);
+
+  // Initialize debugger tables
+  init_tables(tag);
+
+  kprintf("Address of test_global: %p, result: %p\n", &test_global, lookup_symbol("test_global"));
 
 
   kprintf("Printing memory and mods\n");
