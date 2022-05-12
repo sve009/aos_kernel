@@ -170,8 +170,14 @@ void _start(struct stivale2_struct* hdr) {
   kprintf("Printing memory and mods\n");
 
   memmap_print(hdr);
-  BREAK;
+  //BREAK;
   print_mods(hdr);
+
+  // Test exceptions
+  int* z = (int*)0x1;
+  *z = 123;
+
+  __asm__("int $13");
 
 
 
@@ -216,11 +222,7 @@ void _start(struct stivale2_struct* hdr) {
   }
 
 
-  // Test exceptions
-  //int* p = (int*)0x1;
-  //*p = 123;
-
-  //__asm__("int $3");
+  
 
 	// We're done, just hang...
 	halt();
