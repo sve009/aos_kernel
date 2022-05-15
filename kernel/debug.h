@@ -2,10 +2,26 @@
 
 #include <stdint.h>
 
+#include "stivale2.h"
+
 #define BREAK __asm__("int $3")
 
 #define HEXDUMP 0
 #define DECDUMP 1
+
+/**
+ * Find the symbol table and string tables
+ */
+void init_tables(struct stivale2_struct_tag_modules* tag);
+
+/**
+ * Takes a null-terminated string,
+ * and returns the value (most likely address)
+ * associated with it in the kernel binary.
+ *
+ * Returns null if symbol not found
+ */
+uint64_t lookup_symbol(char* symbol);
 
 /** 
  * Dump a region of memory starting at a given
