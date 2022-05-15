@@ -29,6 +29,8 @@ uint64_t lookup_symbol(char* symbol);
  */
 void dump_mem(uint64_t p, int flag, int rows, int cols);
 
+uintptr_t get_addr();
+
 /**
  * Prints out single integer value
  */
