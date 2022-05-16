@@ -23,6 +23,9 @@ void init_tables(struct stivale2_struct_tag_modules* tag);
  */
 uint64_t lookup_symbol(char* symbol);
 
+// Main process loop
+void debug_loop(); 
+
 /** 
  * Dump a region of memory starting at a given
  * point for debugging purposes.

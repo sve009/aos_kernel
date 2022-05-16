@@ -1,17 +1,57 @@
 #include "debug.h"
 
+#include "myio.h"
+
 #include "kprint.h"
 #include "elf.h"
 #include "paging.h"
+#include "pic.h"
 
-// #include <mystring.h>
+#include <mystring.h>
 
 #define ROWSIZE 6
+
+int translate_hex_char(int hex_char) {
+  if (hex_char >= '0' && hex_char <= '9') {
+    return (int)(hex_char - '0');
+  } else if (hex_char >= 'A' && hex_char <= 'F') {
+    return (int)(hex_char - 'A' + 10);
+  } else if (hex_char >= 'a' && hex_char <= 'f') {
+    return (int)(hex_char - 'a' + 10);
+  }
+}
+
+
+// Converts string address to usable addr
+// Strings should be in the format 0x...
+uintptr_t conv_addr(char* in) {
+  int nums[16] = { 0 };
+
+  // Loop through string backwards
+  // Notably cuts off 0x
+  for (int i = strlen(in) - 1; i >= 2; i--) {
+    // Offset of 2 again
+    nums[i - 2] = translate_hex_char(in[i]);  
+  }
+
+  // Keep track
+  uintptr_t addr = 0;
+	uint64_t curr_multiple = 1;
+
+  // Now convert array of numbers to a single entry
+	for (int i = strlen(in) - 4; i >= 0; i--) {
+		addr += (uintptr_t) (nums[i] * curr_multiple);
+		curr_multiple *= 16;
+	}
+
+  return addr;
+}
+
 
 // Reads address from user
 uintptr_t get_addr() {
 	uintptr_t addr = 0x0;
-	uint64_t nums[16];
+	uint64_t nums[16] = { 0 };
 	uint64_t curr_ind = 0;
 
 	kprintf("Input address -> 0x");
@@ -26,22 +66,26 @@ uintptr_t get_addr() {
 		
 		kprintf("%c", curr_char);
 		//translating the characters into numerical hex values
-		if (curr_char <= '0' && curr_char >= '9') {
-			nums[curr_ind] = (uint64_t) curr_char - '0';
-		} else if (curr_char <= 'A' && curr_char >= 'F') {
-			nums[curr_ind] = (uint64_t) curr_char - 'A' + 10;
-		} else if (curr_char <= 'a' && curr_char >= 'f') {
-			nums[curr_ind] = (uint64_t) curr_char - 'a' + 10;
+		if (curr_char >= '0' && curr_char <= '9') {
+			nums[curr_ind] = (uint64_t) (curr_char - '0');
+		} else if (curr_char >= 'A' && curr_char <= 'F') {
+			nums[curr_ind] = (uint64_t) (curr_char - 'A' + 10);
+		} else if (curr_char >= 'a' && curr_char <= 'f') {
+			nums[curr_ind] = (uint64_t) (curr_char - 'a' + 10);
 		}
 
 		curr_ind++;
 	}
 
+  if (curr_ind == 16) {
+    curr_ind = 15;
+  }
+
 	kprintf("\n");
 
 	uint64_t curr_multiple = 1;
-	for (uint64_t backwards_ind = 0; (curr_ind - backwards_ind) >= 0; backwards_ind++) {
-		addr += (uintptr_t) nums[curr_ind - backwards_ind] * curr_multiple;
+	for (int backwards_ind = curr_ind; backwards_ind >= 0; backwards_ind--) {
+		addr += (uintptr_t) (nums[backwards_ind] * curr_multiple);
 		curr_multiple *= 16;
 	}
 
@@ -103,6 +147,72 @@ void init_tables(struct stivale2_struct_tag_modules* tag) {
 
   // Debug make sure string table works
   /** kprintf("Name: %s\n", &strtab[15]); */
+}
+
+// Main loop
+void debug_loop() {
+  for (;;) {
+    // Print a prompt
+    kprintf("(debug) >>> ");
+
+    // Read in the line to buf
+    char buf[70] = { 0 };
+    int i = 0;
+    char curr;
+    curr = kgetc(); 
+    kprintf("%c", curr);
+
+    while (curr != '\n') {
+      buf[i] = curr;
+      i++;
+      curr = kgetc();
+      kprintf("%c", curr);
+    }
+
+    buf[i++] = '\0';
+
+    // Now process the line
+    char* line_words[5] = { 0 };
+    words(buf, line_words);
+
+    // Handle commands
+    if (line_words[0] == NULL) {
+      // Error message
+      kprintf("Valid commands are: [print] [continue]\n");
+      // Do nothing
+    } else if (my_strcmp("print", line_words[0]) == 0) {
+      if (line_words[1] == NULL) {
+        // Prompt for address
+        uintptr_t ptr = get_addr();
+
+        // Print out an int there
+        print_int(ptr);
+      } else if (my_strcmp("stack", line_words[1]) == 0) {
+        // Dump the stack
+        dump_stack();
+      } else if (line_words[1][0] == '0') {
+        // Get Address
+        uintptr_t ptr = conv_addr(line_words[1]);
+
+        // Print out ints worth for now
+        print_int(ptr);
+      } else {
+        // TODO
+        // Global lookups go here (hahhahahahahahahah)
+        //
+        // Prompt for address
+        uintptr_t ptr = get_addr();
+
+        // Print out an int there
+        print_int(ptr);
+      }
+    } else if (my_strcmp("continue", line_words[0]) == 0) {
+      return;
+    } else {
+      // Error message
+      kprintf("Valid commands are: [print] [continue]\n");
+    }
+  }
 }
 
 // Lookup symbol in table

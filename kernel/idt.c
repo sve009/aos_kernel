@@ -116,6 +116,8 @@ void exception3(interrupt_context_t* ctx) {
   kprintf("Flags: %p\n", ctx->flags);
   ctx->flags = ctx->flags | 0x100;
   kprintf("Flags: %p\n", ctx->flags);
+
+  debug_loop();
 }
 
 __attribute__((interrupt))
