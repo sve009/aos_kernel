@@ -79,7 +79,7 @@ void exception1(interrupt_context_t* ctx) {
   //char c = kgetc();
   //kprintf("Char: %c\n");
 
-  int test = 55;
+  //int test = 55;
 
   // Turn on single step
   kprintf("Flags: %p\n", ctx->flags);
@@ -98,24 +98,11 @@ void exception2(interrupt_context_t* ctx) {
  */
 __attribute__((interrupt))
 void exception3(interrupt_context_t* ctx) {
-  kprintf("Pointer: %p\n", ctx->ip);
-  kprintf("3: Breakpoint\n");
-  kprintf("Press anything to continue\n");
-  char c = kgetc();
-  kprintf("Char: %c\n", c);
 
-  int test = 55;
+  //int test = 55;
 
   //dump_mem(&test, HEXDUMP);
-  print_int(&test);
-
-  kprintf("Stack dump\n");
-  dump_stack();
-
-  // Turn on single step
-  kprintf("Flags: %p\n", ctx->flags);
-  ctx->flags = ctx->flags | 0x100;
-  kprintf("Flags: %p\n", ctx->flags);
+  //print_int(&test);
 
   debug_loop();
 }
@@ -395,10 +382,7 @@ void idt_set_handler(uint8_t index, void* fn, uint8_t type) {
   //   selector=IDT_CODE_SELECTOR
 
   // Make function uint64_t so it's *nice*
-  uint64_t f = fn;
-
-  // Zero (64 bit)
-  uint64_t zero = 0;
+  uint64_t f = (uint64_t)fn;
 
   // Split handler into 3 parts:
 

@@ -8,6 +8,7 @@
 
 #define HEXDUMP 0
 #define DECDUMP 1
+#define CHARDUMP 2
 
 /**
  * Find the symbol table and string tables
@@ -38,6 +39,11 @@ uintptr_t get_addr();
  * Prints out single integer value
  */
 void print_int(uint64_t p);
+
+/**
+ * Prints out a string value until null character
+ */
+void print_string(char* s);
 
 /**
  * Dumps out contents of top of stack

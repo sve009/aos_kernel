@@ -116,12 +116,20 @@ void init_tables(struct stivale2_struct_tag_modules* tag) {
     // Get section table
     Elf64_Shdr* shdr = (Elf64_Shdr*)((uint64_t)ehdr->e_shoff + (uint64_t)ehdr);
 
+    // Set string table
+    strtab = (char*)((uint64_t)ehdr + (uint64_t)shdr[ehdr->e_shstrndx].sh_offset);
+
     // Loop until both symbol + string tables found
 
     while (strtab == NULL || symtab == NULL) {
 
+      // Crashes it basically immediately. What's going on here?
+      /** if (shdr->sh_name != 0) { */
+      /**   kprintf("Section: %s\n", &strtab[shdr->sh_name]); */
+      /** } */
+
       // Symbol table
-      if (shdr->sh_type == 2) {
+      if (shdr->sh_type  == 11) {
         // Set number of symbols
         //num_symbols = shdr->sh_size / (sizeof(Elf64_Sym));
         num_symbols = shdr->sh_size / shdr->sh_entsize;
@@ -129,13 +137,8 @@ void init_tables(struct stivale2_struct_tag_modules* tag) {
         kprintf("%d Symbols found\n", num_symbols);
 
         // Set symtab
-        symtab = (Elf64_Sym*)(get_hhdm() + (uint64_t)ehdr + (uint64_t)shdr->sh_offset);
+        symtab = (Elf64_Sym*)((uint64_t)ehdr + (uint64_t)shdr->sh_offset);
         temp = shdr;
-      }
-
-      // String table
-      if (shdr->sh_type == 3) {
-        strtab = (char*)(get_hhdm() + (uint64_t)ehdr + (uint64_t)shdr->sh_offset);
       }
 
       // Increment header entry
@@ -143,10 +146,12 @@ void init_tables(struct stivale2_struct_tag_modules* tag) {
     }
   }
   /** kprintf("Hello\n"); */
-  /** kprintf("strtab: %p\n", strtab); */
+  kprintf("strtab: %p\n", strtab);
 
   // Debug make sure string table works
-  /** kprintf("Name: %s\n", &strtab[15]); */
+  kprintf("Index: %d\n", temp->sh_name);
+  kprintf("String at %p\n", &strtab[temp->sh_name]);
+  kprintf("Name: %c\n", strtab[temp->sh_name]);
 }
 
 // Main loop
@@ -190,6 +195,16 @@ void debug_loop() {
       } else if (my_strcmp("stack", line_words[1]) == 0) {
         // Dump the stack
         dump_stack();
+      } else if (my_strcmp("string", line_words[1]) == 0) {
+        // Print string case. Take next arg as an address
+        if (line_words[2] == NULL) {
+          kprintf("The next argument must be an address\n");
+        } else {
+          // Convert
+          uintptr_t p = conv_addr(line_words[2]);
+          // Print
+          print_string((char*)p);
+        }
       } else if (line_words[1][0] == '0') {
         // Get Address
         uintptr_t ptr = conv_addr(line_words[1]);
@@ -225,7 +240,7 @@ uint64_t lookup_symbol(char* symbol) {
   for (int i = 0; i < num_symbols; i++) {
     char* sym_string = &strtab[symtab[i].st_name];
     kprintf("%s\n", sym_string);
-    if (my_strcmp(symbol, sym_string == 0)) {
+    if (my_strcmp(symbol, sym_string) == 0) {
       return symtab[i].st_value;
     }
   }
@@ -242,20 +257,26 @@ uint64_t lookup_symbol(char* symbol) {
  */
 void dump_mem(uint64_t start, int flag, int rows, int cols) {
   // Recast so math is easier
-  uint16_t* p = (uint16_t*)start;
+  uint8_t* p = (uint8_t*)start;
 
   // Iterate through rows
   for (int i = 0; i < rows; i++) {
     // Print address header
-    kprintf("%p:", p + (cols*i));
+    kprintf("%p:", p + (2*cols*i));
 
     // Iterate through vals
-    for (int j = 0; j < cols; j++) {
-      int val = *(p + (cols*i) + j);
+    for (int j = 0; j < 2*cols; j++) {
+      int val = *(p + (2*cols*i) + j);
       if (flag == HEXDUMP) {
-        kprintf(" %x", val);
-      } else {
+        kprintf(" ");
+        if (val <= 0xF) {
+          kprintf("0");
+        }
+        kprintf("%x", val);
+      } else if (flag == DECDUMP) {
         kprintf(" %d", val);
+      } else {
+        kprintf(" %c", val);
       }
     }
 
@@ -266,13 +287,19 @@ void dump_mem(uint64_t start, int flag, int rows, int cols) {
 }
 
 // Shell function
-// Notice that this is just an
-//  estimate, as the sp isn't exact
 void print_int(uint64_t p) {
-  dump_mem(p, DECDUMP, 1, 2);
+  kprintf("%p: %d\n", p, *((int*)p));
+}
+
+// Another quick shell function
+void print_string(char* s) {
+  kprintf("len: %d\n", strlen(s));
+  dump_mem(s, CHARDUMP, 1, strlen(s)/2);
 }
 
 // Use a quick hack to get stack pointer
+// Notice that this is just an
+//  estimate, as the sp isn't exact
 void dump_stack() {
   // Add something to stack
   int dummy;
@@ -281,6 +308,6 @@ void dump_stack() {
   uint64_t p = &dummy;
 
   // Dump
-  dump_mem(p, HEXDUMP, 16, 10);
+  dump_mem(p, HEXDUMP, 20, 10);
 }
 
