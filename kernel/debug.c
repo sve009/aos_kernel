@@ -214,12 +214,7 @@ void debug_loop() {
       } else {
         // TODO
         // Global lookups go here (hahhahahahahahahah)
-        //
-        // Prompt for address
-        uintptr_t ptr = get_addr();
-
-        // Print out an int there
-        print_int(ptr);
+        kprintf("Valid arguments are an address or [string], followed by an address\n");
       }
     } else if (my_strcmp("continue", line_words[0]) == 0) {
       return;
