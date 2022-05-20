@@ -82,6 +82,8 @@ void exception1(interrupt_context_t* ctx) {
   //int test = 55;
 
   // Turn on single step
+  // Unfortunately doesn't work
+  // Like much of this project
   kprintf("Flags: %p\n", ctx->flags);
   ctx->flags = ctx->flags | 0x100;
   kprintf("Flags: %p\n", ctx->flags);
@@ -104,6 +106,8 @@ void exception3(interrupt_context_t* ctx) {
   //dump_mem(&test, HEXDUMP);
   //print_int(&test);
 
+
+  // Simply start the debugger loop
   debug_loop();
 }
 

@@ -11,6 +11,7 @@
 
 #define ROWSIZE 6
 
+// turns an ascii hex string to an actual number
 int translate_hex_char(int hex_char) {
   if (hex_char >= '0' && hex_char <= '9') {
     return (int)(hex_char - '0');
@@ -100,6 +101,10 @@ Elf64_Sym* symtab;
 int num_symbols;
 
 // Find + set tables
+// Sam's comments:
+//   I really tried to get this up and running, but it's
+//   still not finding tables and failing in really weird
+//   hard to debug ways. I don't know what to do :/
 void init_tables(struct stivale2_struct_tag_modules* tag) {
   // Sanity check
   Elf64_Shdr* temp; 
@@ -149,6 +154,7 @@ void init_tables(struct stivale2_struct_tag_modules* tag) {
   kprintf("strtab: %p\n", strtab);
 
   // Debug make sure string table works
+  //   (It doesn't D:)
   kprintf("Index: %d\n", temp->sh_name);
   kprintf("String at %p\n", &strtab[temp->sh_name]);
   kprintf("Name: %c\n", strtab[temp->sh_name]);
@@ -167,6 +173,7 @@ void debug_loop() {
     curr = kgetc(); 
     kprintf("%c", curr);
 
+    // Run until a line is broken
     while (curr != '\n') {
       // Handle backspaces
       if (curr == '\b') {
@@ -225,6 +232,7 @@ void debug_loop() {
         kprintf("Valid arguments are an address or [string], followed by an address\n");
       }
     } else if (my_strcmp("continue", line_words[0]) == 0) {
+      // Simply leave loop
       return;
     } else {
       // Error message
@@ -234,6 +242,8 @@ void debug_loop() {
 }
 
 // Lookup symbol in table
+// Sadly this isn't functional, because
+// we can't quite find the symbol and string tables
 uint64_t lookup_symbol(char* symbol) {
   // For each symbol in table:
   //   1. Lookup string
@@ -265,20 +275,28 @@ void dump_mem(uint64_t start, int flag, int rows, int cols) {
   // Iterate through rows
   for (int i = 0; i < rows; i++) {
     // Print address header
-    kprintf("%p:", p + (2*cols*i));
+    kprintf("%p:", p + (cols*i));
 
     // Iterate through vals
-    for (int j = 0; j < 2*cols; j++) {
-      int val = *(p + (2*cols*i) + j);
+    for (int j = 0; j < cols; j++) {
+      // Oof pointer math brain hurty
+      int val = *(p + (cols*i) + j);
+
+      // Dump in hex form
       if (flag == HEXDUMP) {
         kprintf(" ");
+        
+        // Nice little hack to
+        //   get rows even
         if (val <= 0xF) {
           kprintf("0");
         }
         kprintf("%x", val);
       } else if (flag == DECDUMP) {
+        // Decimal form
         kprintf(" %d", val);
       } else {
+        // Ascii form
         kprintf(" %c", val);
       }
     }
@@ -297,7 +315,7 @@ void print_int(uint64_t p) {
 // Another quick shell function
 void print_string(char* s) {
   kprintf("len: %d\n", strlen(s));
-  dump_mem(s, CHARDUMP, 1, strlen(s)/2);
+  dump_mem(s, CHARDUMP, 1, strlen(s));
 }
 
 // Use a quick hack to get stack pointer
@@ -311,6 +329,6 @@ void dump_stack() {
   uint64_t p = &dummy;
 
   // Dump
-  dump_mem(p, HEXDUMP, 20, 10);
+  dump_mem(p, HEXDUMP, 20, 20);
 }
 
