@@ -59,7 +59,7 @@ typedef struct idt_record {
 
 // We need to be able to perform syscalls
 //   DON'T CALL WITH MORE THAN 6 ARGS
-extern int64_t syscall(uint64_t nr, ...);
+extern int syscall(uint64_t nr, ...);
 
 extern void syscall_entry();
 

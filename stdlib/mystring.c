@@ -1,5 +1,7 @@
 #include "mystring.h"
 
+#include "myio.h"
+
 int strlen(const char* str) {
   int i = 0;
   while (str[i] != '\0') {
@@ -7,6 +9,18 @@ int strlen(const char* str) {
   }
 
   return i + 1;
+}
+
+void words(char* in, char** out) {
+  out[0] = in;
+  int len = strlen(in);
+  int j = 1;
+  for (int i = 0; i < len; i++) {
+    if (in[i] == ' ' || in[i] == '\n') {
+      out[j++] = &in[i+1];
+      in[i] = '\0';
+    }
+  }
 }
 
 int my_strcmp(char* str1, char* str2) {

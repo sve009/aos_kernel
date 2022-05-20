@@ -13,6 +13,11 @@
 // hhdm
 uintptr_t hhdm;
 
+// Get hhdm back
+uintptr_t get_hhdm() {
+  return hhdm;
+}
+
 // Set hhdm
 void init_hhdm(intptr_t p) {
   hhdm = p;

@@ -8,6 +8,7 @@
 
 #define HEXDUMP 0
 #define DECDUMP 1
+#define CHARDUMP 2
 
 /**
  * Find the symbol table and string tables
@@ -23,16 +24,26 @@ void init_tables(struct stivale2_struct_tag_modules* tag);
  */
 uint64_t lookup_symbol(char* symbol);
 
+// Main process loop
+void debug_loop(); 
+
 /** 
  * Dump a region of memory starting at a given
  * point for debugging purposes.
  */
 void dump_mem(uint64_t p, int flag, int rows, int cols);
 
+uintptr_t get_addr();
+
 /**
  * Prints out single integer value
  */
 void print_int(uint64_t p);
+
+/**
+ * Prints out a string value until null character
+ */
+void print_string(char* s);
 
 /**
  * Dumps out contents of top of stack

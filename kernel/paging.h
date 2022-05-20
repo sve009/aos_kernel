@@ -13,6 +13,9 @@ uintptr_t read_cr3();
 // Write top level page table address
 void write_cr3(uint64_t value);
 
+// Get hhdm back
+uintptr_t get_hhdm();
+
 // Write to global var
 void init_hhdm(intptr_t p);
 

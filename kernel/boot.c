@@ -169,7 +169,7 @@ void _start(struct stivale2_struct* hdr) {
   set_hdr(tag);
 
   // Initialize debugger tables
-  init_tables(tag);
+  //init_tables(tag);
 
   kprintf("Address of test_global: %p, result: %p\n", &test_global, lookup_symbol("test_global"));
 
@@ -177,17 +177,25 @@ void _start(struct stivale2_struct* hdr) {
   kprintf("Printing memory and mods\n");
 
   memmap_print(hdr);
-  //BREAK;
   print_mods(hdr);
-  BREAK;
 
   // Test exceptions
-  int* z = (int*)0x1;
-  *z = 123;
+  //int* z = (int*)0x1;
+  //*z = 123;
 
-  __asm__("int $13");
+  //__asm__("int $13");
 
+  char* test_string = "Hello world\n";
+  kprintf("String: %p\n", test_string);
+  BREAK;
 
+  // Example
+  int16_t i; 
+  kprintf("i: %p\n", &i);
+  for (i = 5; i >= 0; i--) {
+    // Do something
+    //BREAK;
+  }
 
   // Get page table
   uintptr_t table = read_cr3();
