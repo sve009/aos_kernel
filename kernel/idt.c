@@ -131,6 +131,8 @@ void exception7(interrupt_context_t* ctx) {
   kprintf("7: Device not available\n");
   halt();
 }
+
+// the error code will always be zero
 __attribute__((interrupt))
 void exception8(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("8: Double fault ec=%d\n", ec);
@@ -143,25 +145,85 @@ void exception9(interrupt_context_t* ctx) {
 }
 __attribute__((interrupt))
 void exception10(interrupt_context_t* ctx, uint64_t ec) {
-  kprintf("10: Invalid TSS, ec=%d\n", ec);
+  kprintf("10: Invalid TSS, ec=%d\n", ec); 
+  
+  // bit 1: external 
+  if (ec & 0x0001) { kprintf("   There has been an external error\n"); }
+
+  // get selector index: 
+  int16_t index = ec >> 3; 
+
+  // which table is error code from?
+  ec = ec >> 1; 
+
+  // bits 2-3: idt/gdt/ldt
+  if (ec & 0x0000) { kprintf("   Problem occurred in the GDT at index %d\n", index); }
+  if ((ec & 0x0001) || (ec & 0x0003)) { kprintf("    Problem occurred in the IDT at index %d\n", index); }
+  if (ec & 0x0002) { kprintf("   Problem occurred in the LDT at index %d\n", index); }
+
   halt();
 }
 
 __attribute__((interrupt))
 void exception11(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("11: Segment not present, ec=%d\n", ec);
+
+  // bit 1: external 
+  if (ec & 0x0001) { kprintf("   There has been an external error\n"); }
+
+  // get selector index: 
+  int16_t index = ec >> 3; 
+
+  // which table is error code from?
+  ec = ec >> 1; 
+
+  // bits 2-3: idt/gdt/ldt
+  if (ec & 0x0000) { kprintf("   Problem occurred in the GDT at index %d\n", index); }
+  if ((ec & 0x0001) || (ec & 0x0003)) { kprintf("    Problem occurred in the IDT at index %d\n", index); }
+  if (ec & 0x0002) { kprintf("   Problem occurred in the LDT at index %d\n", index); }
+
   halt();
 }
 
 __attribute__((interrupt))
 void exception12(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("12: Stack-Segment fault, ec=%d\n", ec);
+
+  // bit 1: external 
+  if (ec & 0x0001) { kprintf("   There has been an external error\n"); }
+
+  // get selector index: 
+  int16_t index = ec >> 3; 
+
+  // which table is error code from?
+  ec = ec >> 1; 
+
+  // bits 2-3: idt/gdt/ldt
+  if (ec & 0x0000) { kprintf("   Problem occurred in the GDT at index %d\n", index); }
+  if ((ec & 0x0001) || (ec & 0x0003)) { kprintf("    Problem occurred in the IDT at index %d\n", index); }
+  if (ec & 0x0002) { kprintf("   Problem occurred in the LDT at index %d\n", index); }
+
   halt();
 }
 
 __attribute__((interrupt))
 void exception13(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("13: General protection fault, ec=%d\n", ec);
+
+  // bit 1: external 
+  if (ec & 0x0001) { kprintf("   There has been an external error\n"); }
+
+  // get selector index: 
+  int16_t index = ec >> 3; 
+
+  // which table is error code from?
+  ec = ec >> 1; 
+
+  // bits 2-3: idt/gdt/ldt
+  if (ec & 0x0000) { kprintf("   Problem occurred in the GDT at index %d\n", index); }
+  if ((ec & 0x0001) || (ec & 0x0003)) { kprintf("    Problem occurred in the IDT at index %d\n", index); }
+  if (ec & 0x0002) { kprintf("   Problem occurred in the LDT at index %d\n", index); }
+
   halt();
 }
 
@@ -174,6 +236,7 @@ void exception16(interrupt_context_t* ctx) {
 __attribute__((interrupt))
 void exception17(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("17: Alignment check, ec=%d\n", ec);
+  kprintf("    Instruction which caused exception saved in pointer\n");
   halt();
 }
 
@@ -195,6 +258,7 @@ void exception20(interrupt_context_t* ctx) {
   halt();
 }
 
+// no information on this from osdev wiki
 __attribute__((interrupt))
 void exception21(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("21: Control protection exception, ec=%d\n", ec);
@@ -207,12 +271,14 @@ void exception28(interrupt_context_t* ctx) {
   halt();
 }
 
+// no information on this from osdev wiki
 __attribute__((interrupt))
 void exception29(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("29: VMM communication exception, ec=%d\n", ec);
   halt();
 }
 
+// no information on this from osdev wiki
 __attribute__((interrupt))
 void exception30(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("30: Security exception, ec=%d\n", ec);
@@ -230,6 +296,42 @@ __attribute__((interrupt))
 void segfault(interrupt_context_t* ctx, uint64_t ec) {
   kprintf("cr2 = %p\n", read_cr2());
   kprintf("14: Page fault (ec=%d)\n", ec);
+
+  // bit 1: present
+  uint64_t bit = ec & 0x0001; 
+  if (bit == 0) { kprintf("   Non-present page\n"); }
+  else { kprintf("   Page protection violaton\n"); }
+
+  // bit 2: write
+  bit = ec & 0x0002; 
+  if (bit == 0) { kprintf("   Caused by a read access\n"); }
+  else { kprintf ("   Caused by a write access\n"); }
+
+  // bit 3: user
+  bit = ec & 0x0003;  
+  if (bit == 1) { kprintf("   Fault happened in CPL=3\n"); }
+
+  // bit 4: reserved writte
+  bit = ec & 0x0004; 
+  if (bit == 1) { kprintf("   One or more page directory entries contain reserved bits which are set to 1. This only applies when the PSE or PAE flags in CR4 are set to 1\n"); }
+
+  // bit 5: instruction fetch
+  bit = ec & 0x0005; 
+  if (bit == 1) { kprintf("   Fault was caused by an instruction fetch. This only applies when the No-Execute bit is supported and enabled\n"); }
+
+
+  // bit 6: protection key
+  bit = ec & 0x0006;
+  if (bit == 1) { kprintf("   Fault caused by a protection key violation\n"); }
+
+  // bit 7: shadow stack
+  bit = ec & 0x0007;
+  if (bit == 1) { kprintf("   Fault caused by shadow stack access\n"); }
+
+  // bit 15: software guard extensions
+  bit = ec & 0x000f; 
+  if (bit == 1) { kprintf("   Fault due to SGX violation - unrelated to paging\n"); }
+  
   halt();
 }
 

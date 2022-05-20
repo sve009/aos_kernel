@@ -179,6 +179,12 @@ void _start(struct stivale2_struct* hdr) {
   memmap_print(hdr);
   print_mods(hdr);
 
+  // Test exceptions
+  //int* z = (int*)0x1;
+  //*z = 123;
+
+  //__asm__("int $13");
+
   char* test_string = "Hello world\n";
   kprintf("String: %p\n", test_string);
   BREAK;
@@ -232,11 +238,7 @@ void _start(struct stivale2_struct* hdr) {
   }
 
 
-  // Test exceptions
-  //int* p = (int*)0x1;
-  //*p = 123;
-
-  //__asm__("int $3");
+  
 
 	// We're done, just hang...
 	halt();
