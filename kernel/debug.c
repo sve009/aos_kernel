@@ -168,8 +168,16 @@ void debug_loop() {
     kprintf("%c", curr);
 
     while (curr != '\n') {
-      buf[i] = curr;
-      i++;
+      // Handle backspaces
+      if (curr == '\b') {
+        i--;
+      } else {
+        // Everything else
+        buf[i] = curr;
+        i++;
+      }
+
+      // Get next char
       curr = kgetc();
       kprintf("%c", curr);
     }
